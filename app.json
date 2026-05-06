@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Sale Path",
+    "slug": "sale-path",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.salepath.app"
+    },
+    "android": {
+      "package": "com.salepath.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#2ECC71"
+      }
+    },
+    "plugins": [
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": ""
+        }
+      ]
+    ]
+  }
+}
