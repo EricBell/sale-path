@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useRoute } from '../hooks/useRoute';
@@ -34,7 +34,7 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} provider={PROVIDER_GOOGLE} initialRegion={initialRegion}>
+      <MapView style={styles.map} initialRegion={initialRegion}>
         <Marker
           coordinate={{ latitude: home.lat, longitude: home.lng }}
           title="Home"

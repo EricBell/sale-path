@@ -42,7 +42,7 @@ export default function InputScreen({ navigation }: Props) {
   const [homeAddress, setHomeAddress] = useState('');
   const [addressText, setAddressText] = useState('');
   const [sales, setSales] = useState<YardSale[]>([]);
-  const { geocodeAll, loading, error } = useGeocoding();
+  const { geocodeAll, loading, progress, error } = useGeocoding();
 
   const handleAddressTextChange = useCallback((text: string) => {
     setAddressText(text);
@@ -129,7 +129,10 @@ export default function InputScreen({ navigation }: Props) {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color="#fff" />
+            {progress ? <Text style={styles.progressText}>{progress}</Text> : null}
+          </View>
         ) : (
           <Text style={styles.buttonText}>Build Route</Text>
         )}
@@ -181,4 +184,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  progressText: { color: '#fff', fontSize: 14 },
 });

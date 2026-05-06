@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { YardSale, HomeLocation } from '../types';
 import { geocodeAddress } from '../services/geocoding';
 
-const BATCH_SIZE = 10;
-const BATCH_DELAY_MS = 200;
+// Nominatim enforces 1 req/sec — geocode sequentially with a gap.
+const REQUEST_DELAY_MS = 1100;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export function useGeocoding() {
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function geocodeAll(
@@ -16,26 +17,22 @@ export function useGeocoding() {
     homeAddress: string,
   ): Promise<{ sales: YardSale[]; home: HomeLocation } | null> {
     setLoading(true);
+    setProgress('Geocoding home…');
     setError(null);
     try {
       const homeCoords = await geocodeAddress(homeAddress);
       const home: HomeLocation = { address: homeAddress, ...homeCoords };
 
       const result: YardSale[] = [];
-      for (let i = 0; i < sales.length; i += BATCH_SIZE) {
-        const batch = sales.slice(i, i + BATCH_SIZE);
-        const resolved = await Promise.all(
-          batch.map(async (sale) => {
-            try {
-              const coords = await geocodeAddress(sale.rawAddress);
-              return { ...sale, ...coords };
-            } catch {
-              return { ...sale, lat: null, lng: null };
-            }
-          }),
-        );
-        result.push(...resolved);
-        if (i + BATCH_SIZE < sales.length) await sleep(BATCH_DELAY_MS);
+      for (let i = 0; i < sales.length; i++) {
+        setProgress(`Geocoding ${i + 1} / ${sales.length}…`);
+        await sleep(REQUEST_DELAY_MS);
+        try {
+          const coords = await geocodeAddress(sales[i].rawAddress);
+          result.push({ ...sales[i], ...coords });
+        } catch {
+          result.push({ ...sales[i], lat: null, lng: null });
+        }
       }
 
       return { sales: result, home };
@@ -44,8 +41,9 @@ export function useGeocoding() {
       return null;
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }
 
-  return { geocodeAll, loading, error };
+  return { geocodeAll, loading, progress, error };
 }
