@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { RootStackParamList } from '../../App';
 import { YardSale } from '../types';
 import { useGeocoding } from '../hooks/useGeocoding';
@@ -63,6 +65,18 @@ export default function InputScreen({ navigation }: Props) {
     setSales((prev) => prev.map((s) => (s.id === id ? { ...s, notes } : s)));
   }, []);
 
+  const handleLoadFile = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: 'text/*', copyToCacheDirectory: true });
+    if (result.canceled) return;
+    const uri = result.assets[0].uri;
+    try {
+      const content = await FileSystem.readAsStringAsync(uri);
+      handleAddressTextChange(content);
+    } catch {
+      Alert.alert('Could not read file', 'Make sure it is a plain text file.');
+    }
+  }, [handleAddressTextChange]);
+
   const handleBuildRoute = useCallback(async () => {
     if (!homeAddress.trim()) {
       Alert.alert('Home address required', 'Enter your starting address.');
@@ -89,7 +103,12 @@ export default function InputScreen({ navigation }: Props) {
         autoCorrect={false}
       />
 
-      <Text style={styles.label}>Yard sale addresses (one per line)</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>Yard sale addresses (one per line)</Text>
+        <TouchableOpacity onPress={handleLoadFile}>
+          <Text style={styles.loadFileLink}>Load from file</Text>
+        </TouchableOpacity>
+      </View>
       <TextInput
         style={[styles.input, styles.multiline]}
         value={addressText}
@@ -143,7 +162,9 @@ export default function InputScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  label: { fontSize: 14, fontWeight: '600', marginTop: 16, marginBottom: 4, color: '#333' },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+  label: { fontSize: 14, fontWeight: '600', marginTop: 16, color: '#333' },
+  loadFileLink: { fontSize: 13, color: '#2980B9' },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
