@@ -1,5 +1,6 @@
 {
   "expo": {
+    "icon": "./assets/icon.png",
     "name": "Sale Path",
     "slug": "sale-path",
     "version": "1.0.0",
@@ -12,8 +13,10 @@
     "android": {
       "package": "com.salepath.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#2ECC71"
       }
     }
   }
 }
+
