@@ -19,12 +19,17 @@ The app is session-only (no persistence between launches) and always-online (dep
 | Navigation | @react-navigation/native + native-stack |
 | State | Local React state + navigation params (no global store) |
 | Build | EAS Build / Expo Go for development |
-| Tests | Jest 30 + jest-expo + React Native Testing Library |
+| Tests | Jest 29.7 + jest-expo ~54 + React Native Testing Library |
+| CI | GitHub Actions — Claude Code review on PRs + @claude mentions on issues/PRs |
 
 ## Directory Structure
 
 ```
 sale-path/
+├── .github/
+│   └── workflows/
+│       ├── claude.yml            # Claude Code bot — responds to @claude in issues/PRs
+│       └── claude-code-review.yml # Automated Claude review on every PR
 ├── App.tsx                   # Root: NavigationContainer + 3-screen stack
 ├── index.ts                  # Expo entry point
 ├── app.config.js             # Dynamic Expo config — injects GOOGLE_MAPS_API_KEY
