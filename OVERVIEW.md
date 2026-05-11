@@ -18,6 +18,7 @@ The app is session-only (no persistence between launches) and always-online (dep
 | Geocoding | Nominatim (OpenStreetMap) — no API key required |
 | Navigation | @react-navigation/native + native-stack |
 | State | Local React state + navigation params (no global store) |
+| Persistence | @react-native-async-storage/async-storage — cluster radius + home address |
 | Build | EAS Build / Expo Go for development |
 | Tests | Jest 29.7 + jest-expo ~54 + React Native Testing Library |
 | CI | GitHub Actions — Claude Code review on PRs + @claude mentions on issues/PRs |
@@ -30,41 +31,49 @@ sale-path/
 │   └── workflows/
 │       ├── claude.yml            # Claude Code bot — responds to @claude in issues/PRs
 │       └── claude-code-review.yml # Automated Claude review on every PR
-├── App.tsx                   # Root: NavigationContainer + 3-screen stack
+├── App.tsx                   # Root: NavigationContainer + 5-screen stack
 ├── index.ts                  # Expo entry point
 ├── app.config.js             # Dynamic Expo config — injects GOOGLE_MAPS_API_KEY
-├── app.json                  # Static Expo config (package ID, plugins)
-├── eas.json                  # EAS build profiles
+├── app.json                  # Static Expo config (package ID, icon, plugins)
+├── eas.json                  # EAS build profiles (development, preview, production)
+├── assets/
+│   └── icon.png              # App icon — 1024×1024 PNG
 ├── .env.example              # GOOGLE_MAPS_API_KEY placeholder
 └── src/
     ├── types/index.ts        # Core interfaces: YardSale, Cluster, HomeLocation, AppRoute
     ├── screens/
     │   ├── InputScreen.tsx   # Address paste + priority/notes editor + "Build Route"
     │   ├── MapScreen.tsx     # Cluster-colored pins + route polyline
-    │   └── RouteScreen.tsx   # Ordered stop list with Skip / Navigate actions
+    │   ├── RouteScreen.tsx   # Ordered stop list with Skip / Navigate actions
+    │   ├── HelpScreen.tsx    # Explains clustering, colors, and route scoring
+    │   └── SettingsScreen.tsx # Cluster radius input (miles); persisted via AsyncStorage
     ├── hooks/
     │   ├── useGeocoding.ts   # Sequential geocoding with progress state
     │   └── useRoute.ts       # Holds live AppRoute; exposes skip()
     └── services/
         ├── geocoding.ts      # fetch → Nominatim → {lat, lng}
-        ├── clustering.ts     # Union-find at 0.8 km threshold
+        ├── clustering.ts     # Union-find; radius configurable via parameter
         ├── routing.ts        # Greedy priority-weighted nearest-neighbor
-        └── externalNav.ts    # Deep-link to device Maps app per stop
+        ├── externalNav.ts    # Deep-link to device Maps app per stop
+        └── settings.ts       # AsyncStorage load/save for cluster radius + home address
 ```
 
 ## Architecture
 
 ### Navigation flow
 
-Three screens wired by `@react-navigation/native-stack`:
+Five screens wired by `@react-navigation/native-stack`:
 
 ```
-InputScreen
-  → [Build Route] → MapScreen  (params: sales[], clusters[], home)
-      → [View Route List] → RouteScreen  (params: sales[], home)
+InputScreen  ──[⚙]──→ SettingsScreen
+             ──[?]───→ HelpScreen
+             ──[Build Route]──→ MapScreen  (params: sales[], clusters[], home)
+                                    → [View Route List] → RouteScreen  (params: sales[], home)
 ```
 
-All state travels as navigation params — there is no global store. `useRoute` is instantiated independently in both MapScreen and RouteScreen; each holds its own `AppRoute` copy. Skipping a stop on RouteScreen does not update MapScreen's polyline.
+All runtime state travels as navigation params — there is no global store. `useRoute` is instantiated independently in both MapScreen and RouteScreen; each holds its own `AppRoute` copy. Skipping a stop on RouteScreen does not update MapScreen's polyline.
+
+InputScreen uses `useFocusEffect` (not `useEffect`) to reload settings and home address each time it comes into focus, so changes made in SettingsScreen are picked up immediately.
 
 ### Data flow
 
@@ -77,7 +86,7 @@ All state travels as navigation params — there is no global store. `useRoute` 
 
 ### Core algorithms
 
-**Clustering** (`src/services/clustering.ts`): Union-find over pairwise Haversine distances. Any two sales within 0.8 km (≈0.5 miles) are merged. Centroids are averaged lat/lng. Assigns one of 6 hex colors cycling by cluster ID.
+**Clustering** (`src/services/clustering.ts`): Union-find over pairwise Haversine distances. The radius defaults to 0.8 km (≈0.5 miles) but is now a parameter — InputScreen converts the user's saved miles value to km and passes it in. Centroids are averaged lat/lng. Assigns one of 6 hex colors cycling by cluster ID.
 
 **Routing** (`src/services/routing.ts`): Greedy nearest-best-neighbor. At each step, scores every remaining unskipped, geocoded sale:
 
@@ -99,13 +108,22 @@ Priority (1–5) contributes 3–15 pts; a freshness bonus of 5 decays by 0.5 pe
 
 ## Database & Data Layer
 
-Frontend-only — no database or persistent storage. All state is held in React component state and passed via navigation params. Nothing survives an app restart.
+Mostly session-only, but two values are persisted across restarts via `@react-native-async-storage/async-storage` (keys in `src/services/settings.ts`):
+
+| Key | Value |
+|-----|-------|
+| `@sale-path/settings` | JSON object — currently `{ clusterRadiusMiles: number }` |
+| `@sale-path/homeAddress` | Plain string — the starting address field |
+
+All other state (sales list, geocoded coords, route order) is held in React component state and does not survive an app restart.
 
 ## Connectivity & Configuration
 
 | Variable | Purpose |
 |----------|---------|
 | `GOOGLE_MAPS_API_KEY` | Android Maps SDK (map tile rendering). Set in `.env`, injected via `app.config.js` into Expo constants. Not used for geocoding — Nominatim needs no key. |
+
+`expo-file-system` is in `package.json` but **do not use it for persistence** — `FileSystem.documentDirectory` returns null in the current environment. Use `@react-native-async-storage/async-storage` instead (already in use for settings).
 
 ## Key Entry Points
 
@@ -123,4 +141,5 @@ Frontend-only — no database or persistent storage. All state is held in React 
 - **PRD vs. implementation divergence.** `prd.md` specifies Google Maps Geocoding API; the actual code uses Nominatim. `GOOGLE_MAPS_API_KEY` is only used for the map tile renderer (react-native-maps), not for geocoding.
 - **`useRoute` is not shared.** MapScreen and RouteScreen each instantiate `useRoute` independently. The map polyline will not update when stops are skipped on the route list screen.
 - **`visited` field is unused.** `YardSale.visited` is defined in the type but never set to `true` anywhere in the current implementation.
+- **`expo-file-system` is broken in this environment.** `FileSystem.documentDirectory` returns null (cause unknown). The package remains in `package.json` but should not be used for persistence — use `@react-native-async-storage/async-storage` instead.
 - **Out of scope for v1:** offline geocoding, saved routes/history, real drive-time estimation, time/energy cutoff, route-style toggle (priority vs. shortest).

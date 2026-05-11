@@ -16,7 +16,12 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#2ECC71"
       }
+    },
+    "extra": {
+      "googleMapsApiKey": "",
+      "eas": {
+        "projectId": "91812824-03b9-40f8-b8ab-9a564ac36462"
+      }
     }
   }
 }
-
