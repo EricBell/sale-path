@@ -35,7 +35,7 @@ function makeUnionFind(n: number) {
   return { find, union };
 }
 
-export function clusterSales(sales: YardSale[]): Cluster[] {
+export function clusterSales(sales: YardSale[], radiusKm = CLUSTER_RADIUS_KM): Cluster[] {
   const geocoded = sales.filter((s) => s.lat !== null && s.lng !== null);
   const n = geocoded.length;
   if (n === 0) return [];
@@ -44,7 +44,7 @@ export function clusterSales(sales: YardSale[]): Cluster[] {
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const dist = haversineKm(geocoded[i].lat!, geocoded[i].lng!, geocoded[j].lat!, geocoded[j].lng!);
-      if (dist <= CLUSTER_RADIUS_KM) uf.union(i, j);
+      if (dist <= radiusKm) uf.union(i, j);
     }
   }
 

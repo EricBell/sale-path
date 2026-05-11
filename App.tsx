@@ -5,12 +5,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import InputScreen from './src/screens/InputScreen';
 import MapScreen from './src/screens/MapScreen';
 import RouteScreen from './src/screens/RouteScreen';
+import HelpScreen from './src/screens/HelpScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import { YardSale, Cluster, HomeLocation } from './src/types';
 
 export type RootStackParamList = {
   Input: undefined;
   Map: { sales: YardSale[]; clusters: Cluster[]; home: HomeLocation };
   Route: { sales: YardSale[]; home: HomeLocation };
+  Help: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -23,6 +27,8 @@ export default function App() {
           <Stack.Screen name="Input" component={InputScreen} options={{ title: 'Sale Path' }} />
           <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Route Map' }} />
           <Stack.Screen name="Route" component={RouteScreen} options={{ title: 'Route List' }} />
+          <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Help' }} />
+          <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

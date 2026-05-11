@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { RootStackParamList } from '../../App';
 import { YardSale } from '../types';
 import { useGeocoding } from '../hooks/useGeocoding';
 import { clusterSales } from '../services/clustering';
+import { loadSettings, DEFAULT_SETTINGS, loadHomeAddress, saveHomeAddress } from '../services/settings';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Input'>;
 
@@ -43,7 +45,30 @@ export default function InputScreen({ navigation }: Props) {
   const [homeAddress, setHomeAddress] = useState('');
   const [addressText, setAddressText] = useState('');
   const [sales, setSales] = useState<YardSale[]>([]);
+  const [clusterRadiusMiles, setClusterRadiusMiles] = useState(DEFAULT_SETTINGS.clusterRadiusMiles);
   const { geocodeAll, loading, progress, error } = useGeocoding();
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings().then((s) => setClusterRadiusMiles(s.clusterRadiusMiles));
+      loadHomeAddress().then((addr) => { if (addr) setHomeAddress(addr); });
+    }, [])
+  );
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <React.Fragment>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerBtn}>
+            <Text style={styles.headerBtnText}>⚙</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Help')} style={styles.headerBtn}>
+            <Text style={styles.headerBtnText}>?</Text>
+          </TouchableOpacity>
+        </React.Fragment>
+      ),
+    });
+  }, [navigation]);
 
   const handleAddressTextChange = useCallback((text: string) => {
     setAddressText(text);
@@ -88,9 +113,10 @@ export default function InputScreen({ navigation }: Props) {
     }
     const result = await geocodeAll(sales, homeAddress.trim());
     if (!result) return;
-    const clusters = clusterSales(result.sales);
+    const radiusKm = clusterRadiusMiles * 1.60934;
+    const clusters = clusterSales(result.sales, radiusKm);
     navigation.navigate('Map', { sales: result.sales, clusters, home: result.home });
-  }, [homeAddress, sales, geocodeAll, navigation]);
+  }, [homeAddress, sales, geocodeAll, navigation, clusterRadiusMiles]);
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
@@ -98,15 +124,15 @@ export default function InputScreen({ navigation }: Props) {
       <TextInput
         style={styles.input}
         value={homeAddress}
-        onChangeText={setHomeAddress}
+        onChangeText={(t) => { setHomeAddress(t); saveHomeAddress(t); }}
         placeholder="Your home or starting address"
         autoCorrect={false}
       />
 
       <View style={styles.labelRow}>
         <Text style={styles.label}>Yard sale addresses (one per line)</Text>
-        <TouchableOpacity onPress={handleLoadFile}>
-          <Text style={styles.loadFileLink}>Load from file</Text>
+        <TouchableOpacity style={styles.loadButton} onPress={handleLoadFile}>
+          <Text style={styles.loadButtonText}>Load</Text>
         </TouchableOpacity>
       </View>
       <TextInput
@@ -164,7 +190,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
   label: { fontSize: 14, fontWeight: '600', marginTop: 16, color: '#333' },
-  loadFileLink: { fontSize: 13, color: '#2980B9' },
+  loadButton: {
+    borderWidth: 1,
+    borderColor: '#2980B9',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  loadButtonText: { fontSize: 13, color: '#2980B9', fontWeight: '600' },
+  headerBtn: { paddingHorizontal: 10, paddingVertical: 4 },
+  headerBtnText: { fontSize: 18, color: '#2980B9' },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
