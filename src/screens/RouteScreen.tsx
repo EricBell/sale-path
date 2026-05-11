@@ -5,8 +5,11 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { RootStackParamList } from '../../App';
 import { YardSale } from '../types';
 import { useRoute } from '../hooks/useRoute';
@@ -33,6 +36,31 @@ export default function RouteScreen({ navigation, route: navRoute }: Props) {
     loadSettings().then((s) => setClusterRadiusMiles(s.clusterRadiusMiles));
   }, []);
 
+  const handleSave = useCallback(async () => {
+    const remaining = route.orderedStops.filter((s) => !s.skipped);
+    if (remaining.length === 0) return;
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(2);
+    const mo = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    const cc = String(remaining.length).padStart(2, '0');
+    const filename = `${yy}${mo}${dd}_${hh}${mi}_${cc}_Addresses.txt`;
+
+    const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+    if (!dir) { Alert.alert('Error', 'Storage not available.'); return; }
+
+    try {
+      const fileUri = dir + filename;
+      await FileSystem.writeAsStringAsync(fileUri, remaining.map((s) => s.rawAddress).join('\n'));
+      await Sharing.shareAsync(fileUri, { mimeType: 'text/plain', dialogTitle: 'Save address list', UTI: 'public.plain-text' });
+    } catch (e) {
+      Alert.alert('Save failed', e instanceof Error ? e.message : 'Unknown error');
+    }
+  }, [route.orderedStops]);
+
   const handleRebuildMap = useCallback(() => {
     const remaining = route.orderedStops.filter((s) => !s.skipped);
     if (remaining.length === 0) return;
@@ -47,9 +75,14 @@ export default function RouteScreen({ navigation, route: navRoute }: Props) {
       headerRight: () => (
         <View style={styles.headerButtons}>
           {hasRemaining && (
-            <TouchableOpacity onPress={handleRebuildMap} style={styles.headerBtn}>
-              <Text style={styles.headerBtnText}>Rebuild Map</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={handleSave} style={styles.headerBtn}>
+                <Text style={styles.headerBtnText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleRebuildMap} style={styles.headerBtn}>
+                <Text style={styles.headerBtnText}>Rebuild Map</Text>
+              </TouchableOpacity>
+            </>
           )}
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
             <Text style={styles.headerBtnText}>← Map</Text>
@@ -57,7 +90,7 @@ export default function RouteScreen({ navigation, route: navRoute }: Props) {
         </View>
       ),
     });
-  }, [navigation, handleRebuildMap, route.orderedStops]);
+  }, [navigation, handleSave, handleRebuildMap, route.orderedStops]);
 
   return (
     <View style={styles.container}>
