@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { YardSale } from '../types';
 import { useRoute } from '../hooks/useRoute';
-import { CLUSTER_COLORS } from '../services/clustering';
+import { clusterSales, CLUSTER_COLORS } from '../services/clustering';
 import { navigateTo } from '../services/externalNav';
+import { loadSettings, DEFAULT_SETTINGS } from '../services/settings';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Route'>;
 
@@ -26,6 +27,37 @@ function clusterColor(sale: YardSale): string {
 export default function RouteScreen({ navigation, route: navRoute }: Props) {
   const { sales, home } = navRoute.params;
   const { route, skip } = useRoute(sales, home);
+  const [clusterRadiusMiles, setClusterRadiusMiles] = useState(DEFAULT_SETTINGS.clusterRadiusMiles);
+
+  useEffect(() => {
+    loadSettings().then((s) => setClusterRadiusMiles(s.clusterRadiusMiles));
+  }, []);
+
+  const handleRebuildMap = useCallback(() => {
+    const remaining = route.orderedStops.filter((s) => !s.skipped);
+    if (remaining.length === 0) return;
+    const copies = remaining.map((s) => ({ ...s }));
+    const clusters = clusterSales(copies, clusterRadiusMiles * 1.60934);
+    navigation.push('Map', { sales: copies, clusters, home });
+  }, [route.orderedStops, clusterRadiusMiles, home, navigation]);
+
+  useEffect(() => {
+    const hasRemaining = route.orderedStops.some((s) => !s.skipped);
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtons}>
+          {hasRemaining && (
+            <TouchableOpacity onPress={handleRebuildMap} style={styles.headerBtn}>
+              <Text style={styles.headerBtnText}>Rebuild Map</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+            <Text style={styles.headerBtnText}>← Map</Text>
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation, handleRebuildMap, route.orderedStops]);
 
   return (
     <View style={styles.container}>
@@ -68,17 +100,13 @@ export default function RouteScreen({ navigation, route: navRoute }: Props) {
           <Text style={styles.empty}>All stops visited or skipped.</Text>
         }
       />
-
-      <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
-        <Text style={styles.doneBtnText}>Done — Back to Map</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  list: { padding: 12, paddingBottom: 80 },
+  list: { padding: 12 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -112,14 +140,7 @@ const styles = StyleSheet.create({
   },
   btnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   empty: { textAlign: 'center', color: '#aaa', marginTop: 60, fontSize: 16 },
-  doneBtn: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#2C3E50',
-    padding: 18,
-    alignItems: 'center',
-  },
-  doneBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  headerButtons: { flexDirection: 'row', alignItems: 'center' },
+  headerBtn: { paddingHorizontal: 10, paddingVertical: 4 },
+  headerBtnText: { fontSize: 15, color: '#2980B9', fontWeight: '600' },
 });
