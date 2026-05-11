@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { RootStackParamList } from '../../App';
 import { YardSale } from '../types';
 import { useGeocoding } from '../hooks/useGeocoding';
@@ -70,7 +69,8 @@ export default function InputScreen({ navigation }: Props) {
     if (result.canceled) return;
     const uri = result.assets[0].uri;
     try {
-      const content = await FileSystem.readAsStringAsync(uri);
+      const response = await fetch(uri);
+      const content = await response.text();
       handleAddressTextChange(content);
     } catch {
       Alert.alert('Could not read file', 'Make sure it is a plain text file.');
