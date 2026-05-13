@@ -1,9 +1,11 @@
 import React from 'react';
 import { ScrollView, Text, StyleSheet } from 'react-native';
+import { version } from '../../package.json';
 
 export default function HelpScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.version}>Sale Path v{version}</Text>
       <Text style={styles.heading}>Map Colors & Clustering</Text>
       <Text style={styles.body}>
         The colors come from the clustering algorithm. When you hit "Build Route", the app runs a
@@ -40,6 +42,7 @@ export default function HelpScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 20, paddingBottom: 48 },
+  version: { fontSize: 13, color: '#888', marginBottom: 16 },
   heading: { fontSize: 16, fontWeight: '700', color: '#222', marginTop: 20, marginBottom: 8 },
   body: { fontSize: 15, color: '#444', lineHeight: 22, marginBottom: 12 },
 });
