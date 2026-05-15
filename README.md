@@ -23,6 +23,8 @@ Expo's Metro bundler needs to be reachable from your phone. Inside WSL the defau
    ```
 3. Make sure Windows Firewall allows inbound TCP on port 8081 (Metro) from your LAN.
 
+**Alternative — tunnel mode:** `npx expo start --tunnel` creates a public ngrok tunnel so your phone can reach Metro without any port forwarding or firewall rules. It's simpler to set up but noticeably slower. Known gotcha: running `npx ngrok authtoken` rewrites `~/.ngrok2/ngrok.yml` to v3 format, which breaks the `@expo/ngrok` package that Expo uses internally. If the tunnel fails after running that command, delete or restore the config file. The LAN approach above is faster and more reliable for day-to-day development.
+
 ## Install dependencies
 
 ```bash
