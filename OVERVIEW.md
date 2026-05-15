@@ -19,6 +19,7 @@ The app is session-only (no persistence between launches) and always-online (dep
 | Navigation | @react-navigation/native + native-stack |
 | State | Local React state + navigation params (no global store) |
 | Persistence | @react-native-async-storage/async-storage — cluster radius + home address |
+| Sharing | expo-sharing ~14.0 — exports remaining-stop address list as a `.txt` file |
 | Build | EAS Build / Expo Go for development |
 | Tests | Jest 29.7 + jest-expo ~54 + React Native Testing Library |
 | CI | GitHub Actions — Claude Code review on PRs + @claude mentions on issues/PRs |
@@ -69,9 +70,12 @@ InputScreen  ──[⚙]──→ SettingsScreen
              ──[?]───→ HelpScreen
              ──[Build Route]──→ MapScreen  (params: sales[], clusters[], home)
                                     → [View Route List] → RouteScreen  (params: sales[], home)
+                                                              → [Rebuild Map] → MapScreen (new instance, remaining stops only)
 ```
 
-All runtime state travels as navigation params — there is no global store. `useRoute` is instantiated independently in both MapScreen and RouteScreen; each holds its own `AppRoute` copy. Skipping a stop on RouteScreen does not update MapScreen's polyline.
+All runtime state travels as navigation params — there is no global store. `useRoute` is instantiated independently in both MapScreen and RouteScreen; each holds its own `AppRoute` copy. Skipping a stop on RouteScreen does not update the originating MapScreen's polyline.
+
+RouteScreen's navigation bar has three header buttons (visible when stops remain): **Save** (exports remaining addresses as a timestamped `.txt` via `expo-sharing`), **Rebuild Map** (re-clusters remaining stops and pushes a fresh MapScreen), and **← Map** (go back). The old bottom "Done — Back to Map" button has been removed.
 
 InputScreen uses `useFocusEffect` (not `useEffect`) to reload settings and home address each time it comes into focus, so changes made in SettingsScreen are picked up immediately.
 
@@ -83,6 +87,7 @@ InputScreen uses `useFocusEffect` (not `useEffect`) to reload settings and home 
 4. Navigate to MapScreen with geocoded sales + clusters
 5. `useRoute` calls `buildRoute()` → greedy algorithm produces `AppRoute`
 6. RouteScreen calls `skip(id)` → re-runs `buildRoute()` on updated sales array
+7. (Optional) "Rebuild Map" → filters to non-skipped stops, re-clusters, pushes a new MapScreen with only remaining stops
 
 ### Core algorithms
 
@@ -141,5 +146,6 @@ All other state (sales list, geocoded coords, route order) is held in React comp
 - **PRD vs. implementation divergence.** `prd.md` specifies Google Maps Geocoding API; the actual code uses Nominatim. `GOOGLE_MAPS_API_KEY` is only used for the map tile renderer (react-native-maps), not for geocoding.
 - **`useRoute` is not shared.** MapScreen and RouteScreen each instantiate `useRoute` independently. The map polyline will not update when stops are skipped on the route list screen.
 - **`visited` field is unused.** `YardSale.visited` is defined in the type but never set to `true` anywhere in the current implementation.
-- **`expo-file-system` is broken in this environment.** `FileSystem.documentDirectory` returns null (cause unknown). The package remains in `package.json` but should not be used for persistence — use `@react-native-async-storage/async-storage` instead.
+- **Version display.** HelpScreen reads `version` directly from `package.json` and shows it as "Sale Path v{version}" at the top of the screen.
+- **`expo-file-system` quirk.** `FileSystem.documentDirectory` returns null in this environment (cause unknown). RouteScreen's Save feature uses `expo-file-system/legacy` (not the main entrypoint) and falls back to `cacheDirectory ?? documentDirectory`. For persistent key-value storage use `@react-native-async-storage/async-storage` instead.
 - **Out of scope for v1:** offline geocoding, saved routes/history, real drive-time estimation, time/energy cutoff, route-style toggle (priority vs. shortest).
