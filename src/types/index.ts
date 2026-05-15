@@ -27,3 +27,14 @@ export interface AppRoute {
   orderedStops: YardSale[];
   home: HomeLocation;
 }
+
+export interface SavedMap {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  sales: YardSale[];
+  clusters: Cluster[];
+  home: HomeLocation;
+  clusterRadiusMiles: number;
+}

@@ -8,16 +8,18 @@ import RouteScreen from './src/screens/RouteScreen';
 import ValidationScreen from './src/screens/ValidationScreen';
 import HelpScreen from './src/screens/HelpScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import SavedMapsScreen from './src/screens/SavedMapsScreen';
 import { YardSale, Cluster, HomeLocation } from './src/types';
 import { ValidatedEntry } from './src/services/validation';
 
 export type RootStackParamList = {
   Input: undefined;
   Validation: { entries: ValidatedEntry[]; sales: YardSale[]; homeAddress: string; clusterRadiusMiles: number };
-  Map: { sales: YardSale[]; clusters: Cluster[]; home: HomeLocation };
+  Map: { sales: YardSale[]; clusters: Cluster[]; home: HomeLocation; clusterRadiusMiles: number; savedMapId?: string };
   Route: { sales: YardSale[]; home: HomeLocation };
   Help: undefined;
   Settings: undefined;
+  SavedMaps: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -33,6 +35,7 @@ export default function App() {
           <Stack.Screen name="Route" component={RouteScreen} options={{ title: 'Route List' }} />
           <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Help' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+          <Stack.Screen name="SavedMaps" component={SavedMapsScreen} options={{ title: 'Saved Maps' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

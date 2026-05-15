@@ -80,7 +80,7 @@ export default function ValidationScreen({ navigation, route: navRoute }: Props)
     if (!result) return;
     const radiusKm = clusterRadiusMiles * 1.60934;
     const clusters = clusterSales(result.sales, radiusKm);
-    navigation.navigate('Map', { sales: result.sales, clusters, home: result.home });
+    navigation.navigate('Map', { sales: result.sales, clusters, home: result.home, clusterRadiusMiles });
   }, [items, geocodeAll, homeAddress, clusterRadiusMiles, navigation]);
 
   const keptCount = items.filter((i) => !i.removed).length;

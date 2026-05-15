@@ -1,18 +1,57 @@
-import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useRoute } from '../hooks/useRoute';
 import { CLUSTER_COLORS } from '../services/clustering';
+import { saveMap, generateMapName } from '../services/savedMaps';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Map'>;
 
 const HOME_COLOR = '#2C3E50';
 
 export default function MapScreen({ navigation, route: navRoute }: Props) {
-  const { sales, clusters, home } = navRoute.params;
+  const { sales, clusters, home, clusterRadiusMiles, savedMapId } = navRoute.params;
   const { route } = useRoute(sales, home);
+
+  const doSave = useCallback(async (id: string) => {
+    const stopCount = sales.filter((s) => s.lat !== null).length;
+    const now = Date.now();
+    await saveMap({
+      id,
+      name: generateMapName(stopCount),
+      createdAt: now,
+      updatedAt: now,
+      sales,
+      clusters,
+      home,
+      clusterRadiusMiles,
+    });
+    Alert.alert('Saved', 'Map saved successfully.');
+  }, [sales, clusters, home, clusterRadiusMiles]);
+
+  const handleSave = useCallback(() => {
+    if (savedMapId) {
+      Alert.alert('Save Map', 'Update the existing saved map or save as a new entry?', [
+        { text: 'Overwrite', onPress: () => doSave(savedMapId) },
+        { text: 'Save as New', onPress: () => doSave(Date.now().toString()) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } else {
+      doSave(Date.now().toString());
+    }
+  }, [savedMapId, doSave]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={handleSave} style={styles.headerBtn}>
+          <Text style={styles.headerBtnText}>Save</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, handleSave]);
 
   const initialRegion = {
     latitude: home.lat,
@@ -73,6 +112,8 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  headerBtn: { paddingHorizontal: 10, paddingVertical: 4 },
+  headerBtnText: { fontSize: 15, color: '#2980B9', fontWeight: '600' },
   fab: {
     position: 'absolute',
     bottom: 32,

@@ -66,7 +66,7 @@ export default function RouteScreen({ navigation, route: navRoute }: Props) {
     if (remaining.length === 0) return;
     const copies = remaining.map((s) => ({ ...s }));
     const clusters = clusterSales(copies, clusterRadiusMiles * 1.60934);
-    navigation.push('Map', { sales: copies, clusters, home });
+    navigation.push('Map', { sales: copies, clusters, home, clusterRadiusMiles });
   }, [route.orderedStops, clusterRadiusMiles, home, navigation]);
 
   useEffect(() => {

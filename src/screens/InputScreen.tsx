@@ -60,6 +60,9 @@ export default function InputScreen({ navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <React.Fragment>
+          <TouchableOpacity onPress={() => navigation.navigate('SavedMaps')} style={styles.headerBtn}>
+            <Text style={styles.headerBtnText}>Maps</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerBtn}>
             <Text style={styles.headerBtnText}>⚙</Text>
           </TouchableOpacity>
@@ -126,7 +129,7 @@ export default function InputScreen({ navigation }: Props) {
     if (!result) return;
     const radiusKm = clusterRadiusMiles * 1.60934;
     const clusters = clusterSales(result.sales, radiusKm);
-    navigation.navigate('Map', { sales: result.sales, clusters, home: result.home });
+    navigation.navigate('Map', { sales: result.sales, clusters, home: result.home, clusterRadiusMiles });
   }, [homeAddress, sales, geocodeAll, navigation, clusterRadiusMiles]);
 
   return (
