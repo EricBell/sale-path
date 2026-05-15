@@ -17,6 +17,7 @@ import { YardSale } from '../types';
 import { useGeocoding } from '../hooks/useGeocoding';
 import { clusterSales } from '../services/clustering';
 import { loadSettings, DEFAULT_SETTINGS, loadHomeAddress, saveHomeAddress } from '../services/settings';
+import { validateAddresses, hasIssues } from '../services/validation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Input'>;
 
@@ -109,6 +110,16 @@ export default function InputScreen({ navigation }: Props) {
     }
     if (sales.length === 0) {
       Alert.alert('No addresses', 'Paste at least one yard sale address.');
+      return;
+    }
+    const entries = validateAddresses(sales.map((s) => s.rawAddress));
+    if (hasIssues(entries)) {
+      navigation.navigate('Validation', {
+        entries,
+        sales,
+        homeAddress: homeAddress.trim(),
+        clusterRadiusMiles,
+      });
       return;
     }
     const result = await geocodeAll(sales, homeAddress.trim());
