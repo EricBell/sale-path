@@ -1,4 +1,4 @@
-export type ValidationIssue = 'duplicate' | 'no-number' | 'too-short' | 'junk';
+export type ValidationIssue = 'duplicate' | 'no-number' | 'too-short' | 'junk' | 'has-note';
 
 export interface ValidatedEntry {
   original: string;
@@ -46,6 +46,10 @@ export function validateAddresses(raws: string[]): ValidatedEntry[] {
 
     if (!/^\d/.test(normalized)) {
       issues.push('no-number');
+    }
+
+    if (/\(.*?\)/.test(normalized)) {
+      issues.push('has-note');
     }
 
     const key = dedupeKey(normalized);

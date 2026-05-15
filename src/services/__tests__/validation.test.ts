@@ -51,6 +51,11 @@ describe('validateAddresses', () => {
     expect(entries[1].issues).toContain('duplicate');
   });
 
+  it('flags parenthetical notes', () => {
+    const [entry] = validateAddresses(['4 main st (community ctr inside), Atkinson, 03811']);
+    expect(entry.issues).toContain('has-note');
+  });
+
   it('does not flag a valid address', () => {
     const [entry] = validateAddresses(['14 Tracy Ln, Plaistow, NH 03865']);
     expect(entry.issues).toHaveLength(0);

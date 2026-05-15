@@ -30,6 +30,7 @@ const ISSUE_LABEL: Record<ValidationIssue, string> = {
   'no-number': 'No house #',
   'too-short': 'Incomplete?',
   junk: 'Looks like junk',
+  'has-note': 'Remove note before geocoding',
 };
 
 function issueColor(issues: ValidationIssue[]): string {
