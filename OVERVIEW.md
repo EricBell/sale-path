@@ -22,6 +22,7 @@ The app is session-only (no persistence between launches) and always-online (dep
 | Sharing | expo-sharing ~14.0 — exports remaining-stop address list as a `.txt` file |
 | Build | EAS Build / Expo Go for development |
 | Tests | Jest 29.7 + jest-expo ~54 + React Native Testing Library |
+| Persistence (maps) | @react-native-async-storage/async-storage — full `SavedMap` objects |
 | CI | GitHub Actions — Claude Code review on PRs + @claude mentions on issues/PRs |
 
 ## Directory Structure
@@ -41,13 +42,15 @@ sale-path/
 │   └── icon.png              # App icon — 1024×1024 PNG
 ├── .env.example              # GOOGLE_MAPS_API_KEY placeholder
 └── src/
-    ├── types/index.ts        # Core interfaces: YardSale, Cluster, HomeLocation, AppRoute
+    ├── types/index.ts        # Core interfaces: YardSale, Cluster, HomeLocation, AppRoute, SavedMap
     ├── screens/
-    │   ├── InputScreen.tsx   # Address paste + priority/notes editor + "Build Route"
-    │   ├── MapScreen.tsx     # Cluster-colored pins + route polyline
-    │   ├── RouteScreen.tsx   # Ordered stop list with Skip / Navigate actions
-    │   ├── HelpScreen.tsx    # Explains clustering, colors, and route scoring
-    │   └── SettingsScreen.tsx # Cluster radius input (miles); persisted via AsyncStorage
+    │   ├── InputScreen.tsx       # Address paste + priority/notes editor + "Build Route"
+    │   ├── ValidationScreen.tsx  # Pre-geocoding review: flags issues, allows inline edits/removals
+    │   ├── MapScreen.tsx         # Cluster-colored pins + route polyline
+    │   ├── RouteScreen.tsx       # Ordered stop list with Skip / Navigate actions
+    │   ├── HelpScreen.tsx        # Explains clustering, colors, and route scoring
+    │   ├── SettingsScreen.tsx    # Cluster radius input (miles); persisted via AsyncStorage
+    │   └── SavedMapsScreen.tsx   # List saved routes; load, rename, delete
     ├── hooks/
     │   ├── useGeocoding.ts   # Sequential geocoding with progress state
     │   └── useRoute.ts       # Holds live AppRoute; exposes skip()
@@ -56,21 +59,25 @@ sale-path/
         ├── clustering.ts     # Union-find; radius configurable via parameter
         ├── routing.ts        # Greedy priority-weighted nearest-neighbor
         ├── externalNav.ts    # Deep-link to device Maps app per stop
-        └── settings.ts       # AsyncStorage load/save for cluster radius + home address
+        ├── settings.ts       # AsyncStorage load/save for cluster radius + home address
+        ├── validation.ts     # Address normalization + issue detection (duplicates, no-number, junk, has-note)
+        └── savedMaps.ts      # AsyncStorage CRUD for SavedMap objects
 ```
 
 ## Architecture
 
 ### Navigation flow
 
-Five screens wired by `@react-navigation/native-stack`:
+Seven screens wired by `@react-navigation/native-stack`:
 
 ```
 InputScreen  ──[⚙]──→ SettingsScreen
              ──[?]───→ HelpScreen
-             ──[Build Route]──→ MapScreen  (params: sales[], clusters[], home)
-                                    → [View Route List] → RouteScreen  (params: sales[], home)
-                                                              → [Rebuild Map] → MapScreen (new instance, remaining stops only)
+             ──[💾]──→ SavedMapsScreen  → [Load] → MapScreen (existing saved route)
+             ──[Build Route]──→ ValidationScreen  (params: entries[], sales[], homeAddress, clusterRadiusMiles)
+                                    ──[Proceed]──→ MapScreen  (params: sales[], clusters[], home, clusterRadiusMiles, savedMapId?)
+                                                       → [View Route List] → RouteScreen  (params: sales[], home)
+                                                                                 → [Rebuild Map] → MapScreen (new instance, remaining stops only)
 ```
 
 All runtime state travels as navigation params — there is no global store. `useRoute` is instantiated independently in both MapScreen and RouteScreen; each holds its own `AppRoute` copy. Skipping a stop on RouteScreen does not update the originating MapScreen's polyline.
@@ -82,12 +89,15 @@ InputScreen uses `useFocusEffect` (not `useEffect`) to reload settings and home 
 ### Data flow
 
 1. User pastes addresses in InputScreen → `YardSale[]` built client-side (no coords yet)
-2. "Build Route" triggers `useGeocoding.geocodeAll()` — sequential Nominatim requests, 1.1 s apart (rate limit compliance)
-3. After geocoding, `clusterSales()` runs once → assigns `clusterId` on each `YardSale` in-place, returns `Cluster[]`
-4. Navigate to MapScreen with geocoded sales + clusters
-5. `useRoute` calls `buildRoute()` → greedy algorithm produces `AppRoute`
-6. RouteScreen calls `skip(id)` → re-runs `buildRoute()` on updated sales array
-7. (Optional) "Rebuild Map" → filters to non-skipped stops, re-clusters, pushes a new MapScreen with only remaining stops
+2. "Build Route" calls `validateAddresses()` → normalizes addresses and flags issues (duplicates, missing house numbers, junk lines, parenthetical notes)
+3. Navigate to ValidationScreen — user can edit addresses inline or mark them removed; issues shown as colored badges
+4. "Proceed" triggers `useGeocoding.geocodeAll()` on kept addresses — sequential Nominatim requests, 1.1 s apart (rate limit compliance)
+5. After geocoding, `clusterSales()` runs once → assigns `clusterId` on each `YardSale` in-place, returns `Cluster[]`
+6. Navigate to MapScreen with geocoded sales + clusters
+7. `useRoute` calls `buildRoute()` → greedy algorithm produces `AppRoute`
+8. RouteScreen calls `skip(id)` → re-runs `buildRoute()` on updated sales array
+9. (Optional) "Rebuild Map" → filters to non-skipped stops, re-clusters, pushes a new MapScreen with only remaining stops
+10. (Optional) MapScreen "Save" → `saveMap()` persists the full `SavedMap` to AsyncStorage; LoadedMaps screen can load it back
 
 ### Core algorithms
 
@@ -113,14 +123,17 @@ Priority (1–5) contributes 3–15 pts; a freshness bonus of 5 decays by 0.5 pe
 
 ## Database & Data Layer
 
-Mostly session-only, but two values are persisted across restarts via `@react-native-async-storage/async-storage` (keys in `src/services/settings.ts`):
+Three AsyncStorage keys persist data across restarts:
 
-| Key | Value |
-|-----|-------|
-| `@sale-path/settings` | JSON object — currently `{ clusterRadiusMiles: number }` |
-| `@sale-path/homeAddress` | Plain string — the starting address field |
+| Key | Value | Managed by |
+|-----|-------|-----------|
+| `@sale-path/settings` | JSON — `{ clusterRadiusMiles: number }` | `src/services/settings.ts` |
+| `@sale-path/homeAddress` | Plain string — starting address | `src/services/settings.ts` |
+| `@sale-path/savedMaps` | JSON array of `SavedMap` objects | `src/services/savedMaps.ts` |
 
-All other state (sales list, geocoded coords, route order) is held in React component state and does not survive an app restart.
+`SavedMap` stores: `id`, `name`, `createdAt`, `updatedAt`, `sales[]`, `clusters[]`, `home`, `clusterRadiusMiles`. Full routes now survive app restarts and can be reloaded from SavedMapsScreen.
+
+Transient state (active geocoding, live route order, skip state) is still held in React component state and does not persist.
 
 ## Connectivity & Configuration
 
@@ -141,6 +154,7 @@ All other state (sales list, geocoded coords, route order) is held in React comp
 
 ## Notes & Gotchas
 
+- **Validation runs before geocoding.** `validateAddresses()` in `src/services/validation.ts` normalizes and flags addresses (5 issue types). The `has-note` issue flags addresses containing parentheticals like `(cash only)` — these need to be stripped before geocoding or Nominatim will fail to match them. ValidationScreen lets users edit addresses inline or remove them before geocoding starts.
 - **Geocoding is sequential, not parallel.** `useGeocoding.ts` sleeps 1.1 s between requests to respect Nominatim's 1 req/sec policy. For 20 addresses this takes ~22 seconds.
 - **`clusterSales()` mutates its input.** It writes `clusterId` directly onto each `YardSale` object passed in. This is intentional — the same objects flow to MapScreen and RouteScreen.
 - **PRD vs. implementation divergence.** `prd.md` specifies Google Maps Geocoding API; the actual code uses Nominatim. `GOOGLE_MAPS_API_KEY` is only used for the map tile renderer (react-native-maps), not for geocoding.
