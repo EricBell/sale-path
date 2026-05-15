@@ -55,6 +55,16 @@ npm run test:coverage
 
 Tests live in `src/services/__tests__/` and cover all four services. They run in Jest with the `jest-expo` preset. `jest.setup.js` pre-resolves Expo lazy globals that throw inside tests.
 
+## Versioning
+
+Bump `version` in `package.json` using semantic versioning on every feature or fix:
+
+- **New feature** → increment minor (`1.0.0` → `1.1.0`): `npm version minor --no-git-tag-version`
+- **Bug fix** → increment patch (`1.1.0` → `1.1.1`): `npm version patch --no-git-tag-version`
+- **Breaking change** → increment major: `npm version major --no-git-tag-version`
+
+The version string is displayed in HelpScreen (`src/screens/HelpScreen.tsx`) and is read directly from `package.json`, so bumping `package.json` is the only step required.
+
 ### Environment
 
 `GOOGLE_MAPS_API_KEY` in `.env` is read by `app.config.js` and exposed via `expo-constants`. The key is not used yet — geocoding currently runs through Nominatim without a key.
