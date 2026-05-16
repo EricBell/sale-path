@@ -6,6 +6,7 @@ import { RootStackParamList } from '../../App';
 import { useRoute } from '../hooks/useRoute';
 import { CLUSTER_COLORS } from '../services/clustering';
 import { saveMap, generateMapName } from '../services/savedMaps';
+import { navigateTo } from '../services/externalNav';
 import { YardSale } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Map'>;
@@ -140,17 +141,25 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
           {selectedSale.sale.notes ? (
             <Text style={styles.overlayNotes}>{selectedSale.sale.notes}</Text>
           ) : null}
-          <TouchableOpacity
-            style={[styles.visitBtn, visitedIds.has(selectedSale.sale.id) && styles.visitedBtn]}
-            onPress={() => {
-              toggleVisited(selectedSale.sale.id);
-              setSelectedSale(null);
-            }}
-          >
-            <Text style={styles.visitBtnText}>
-              {visitedIds.has(selectedSale.sale.id) ? 'Mark Unvisited' : 'Mark Visited ✓'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.overlayActions}>
+            <TouchableOpacity
+              style={styles.navigateBtn}
+              onPress={() => navigateTo(selectedSale.sale)}
+            >
+              <Text style={styles.overlayBtnText}>Navigate</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.visitBtn, visitedIds.has(selectedSale.sale.id) && styles.visitedBtn]}
+              onPress={() => {
+                toggleVisited(selectedSale.sale.id);
+                setSelectedSale(null);
+              }}
+            >
+              <Text style={styles.overlayBtnText}>
+                {visitedIds.has(selectedSale.sale.id) ? 'Mark Unvisited' : 'Mark Visited ✓'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -188,15 +197,23 @@ const styles = StyleSheet.create({
   closeBtn: { paddingLeft: 10, paddingTop: 2 },
   closeBtnText: { fontSize: 16, color: '#999', fontWeight: '700' },
   overlayNotes: { fontSize: 13, color: '#666', marginBottom: 8 },
+  overlayActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  navigateBtn: {
+    flex: 1,
+    backgroundColor: '#3498DB',
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
   visitBtn: {
+    flex: 1,
     backgroundColor: '#2980B9',
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: 'center',
-    marginTop: 8,
   },
   visitedBtn: { backgroundColor: '#27AE60' },
-  visitBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  overlayBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   fab: {
     position: 'absolute',
     bottom: 32,
