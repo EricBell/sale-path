@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
-import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useRoute } from '../hooks/useRoute';
 import { CLUSTER_COLORS } from '../services/clustering';
 import { saveMap, generateMapName } from '../services/savedMaps';
+import { YardSale } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Map'>;
 
@@ -18,6 +19,7 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
   const [visitedIds, setVisitedIds] = useState<Set<string>>(
     () => new Set(sales.filter((s) => s.visited).map((s) => s.id))
   );
+  const [selectedSale, setSelectedSale] = useState<{ sale: YardSale; index: number } | null>(null);
 
   const toggleVisited = useCallback((id: string) => {
     setVisitedIds((prev) => {
@@ -87,7 +89,11 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={initialRegion}>
+      <MapView
+        style={styles.map}
+        initialRegion={initialRegion}
+        onPress={() => setSelectedSale(null)}
+      >
         <Marker
           coordinate={{ latitude: home.lat, longitude: home.lng }}
           title="Home"
@@ -97,38 +103,56 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
         {route.orderedStops.map((sale, index) => {
           if (sale.lat === null || sale.lng === null) return null;
           const isVisited = visitedIds.has(sale.id);
+          const coord = { latitude: sale.lat, longitude: sale.lng };
+          const onPress = () => setSelectedSale({ sale, index });
+          if (isVisited) {
+            return (
+              <Marker key={sale.id} coordinate={coord} onPress={onPress} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+                <View style={styles.visitedMarker}>
+                  <Text style={styles.visitedMarkerCheck}>✓</Text>
+                </View>
+              </Marker>
+            );
+          }
           return (
             <Marker
               key={sale.id}
-              coordinate={{ latitude: sale.lat, longitude: sale.lng }}
-              pinColor={
-                isVisited
-                  ? '#AAAAAA'
-                  : sale.clusterId !== null
-                  ? clusterColorById.get(sale.clusterId) ?? '#888'
-                  : '#888'
-              }
-            >
-              <Callout>
-                <View style={styles.callout}>
-                  <Text style={styles.calloutTitle}>{`${index + 1}. ${sale.rawAddress}`}</Text>
-                  {sale.notes ? <Text style={styles.calloutNotes}>{sale.notes}</Text> : null}
-                  <TouchableOpacity
-                    style={[styles.visitBtn, isVisited && styles.visitedBtn]}
-                    onPress={() => toggleVisited(sale.id)}
-                  >
-                    <Text style={styles.visitBtnText}>
-                      {isVisited ? 'Mark Unvisited' : 'Mark Visited ✓'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Callout>
-            </Marker>
+              coordinate={coord}
+              pinColor={sale.clusterId !== null ? clusterColorById.get(sale.clusterId) ?? '#888' : '#888'}
+              onPress={onPress}
+            />
           );
         })}
 
         <Polyline coordinates={polyline} strokeColor="#2C3E50" strokeWidth={2} lineDashPattern={[6, 3]} />
       </MapView>
+
+      {selectedSale && (
+        <View style={styles.overlay}>
+          <View style={styles.overlayHeader}>
+            <Text style={styles.overlayTitle} numberOfLines={2}>
+              {`${selectedSale.index + 1}. ${selectedSale.sale.rawAddress}`}
+            </Text>
+            <TouchableOpacity onPress={() => setSelectedSale(null)} style={styles.closeBtn}>
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          {selectedSale.sale.notes ? (
+            <Text style={styles.overlayNotes}>{selectedSale.sale.notes}</Text>
+          ) : null}
+          <TouchableOpacity
+            style={[styles.visitBtn, visitedIds.has(selectedSale.sale.id) && styles.visitedBtn]}
+            onPress={() => {
+              toggleVisited(selectedSale.sale.id);
+              setSelectedSale(null);
+            }}
+          >
+            <Text style={styles.visitBtnText}>
+              {visitedIds.has(selectedSale.sale.id) ? 'Mark Unvisited' : 'Mark Visited ✓'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <TouchableOpacity
         style={styles.fab}
@@ -145,6 +169,34 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   headerBtn: { paddingHorizontal: 10, paddingVertical: 4 },
   headerBtnText: { fontSize: 15, color: '#2980B9', fontWeight: '600' },
+  overlay: {
+    position: 'absolute',
+    bottom: 110,
+    left: 16,
+    right: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  overlayHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  overlayTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#222' },
+  closeBtn: { paddingLeft: 10, paddingTop: 2 },
+  closeBtnText: { fontSize: 16, color: '#999', fontWeight: '700' },
+  overlayNotes: { fontSize: 13, color: '#666', marginBottom: 8 },
+  visitBtn: {
+    backgroundColor: '#2980B9',
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  visitedBtn: { backgroundColor: '#27AE60' },
+  visitBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   fab: {
     position: 'absolute',
     bottom: 32,
@@ -160,17 +212,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  callout: { width: 220, padding: 6 },
-  calloutTitle: { fontSize: 14, fontWeight: '600', color: '#222', marginBottom: 2 },
-  calloutNotes: { fontSize: 12, color: '#666', marginBottom: 4 },
-  visitBtn: {
-    backgroundColor: '#2980B9',
-    borderRadius: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+  visitedMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#888',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
+    borderWidth: 2,
+    borderColor: '#fff',
+    elevation: 3,
   },
-  visitedBtn: { backgroundColor: '#27AE60' },
-  visitBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  visitedMarkerCheck: { color: '#fff', fontSize: 15, fontWeight: '700', lineHeight: 18 },
 });
