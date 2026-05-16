@@ -6,7 +6,7 @@
 
 Sale Path solves a specific problem: the shortest-distance route isn't the best yard-sale route. High-priority sales should be hit early while energy is high, even if they're slightly out of the way. The scoring algorithm explicitly biases toward high-priority stops at the start of the route, decaying as the morning progresses.
 
-The app is session-only (no persistence between launches) and always-online (depends on network for geocoding and map tiles). Input is a plain-text paste of addresses, one per line.
+The app is always-online (depends on network for geocoding and map tiles). Input is a plain-text paste of addresses, one per line. Completed routes can be saved and reloaded across sessions.
 
 ## Tech Stack
 
@@ -46,7 +46,7 @@ sale-path/
     ├── screens/
     │   ├── InputScreen.tsx       # Address paste + priority/notes editor + "Build Route"
     │   ├── ValidationScreen.tsx  # Pre-geocoding review: flags issues, allows inline edits/removals
-    │   ├── MapScreen.tsx         # Cluster-colored pins + route polyline
+    │   ├── MapScreen.tsx         # Cluster-colored pins + route polyline; tap pin for overlay (Navigate, Mark Visited)
     │   ├── RouteScreen.tsx       # Ordered stop list with Skip / Navigate actions
     │   ├── HelpScreen.tsx        # Explains clustering, colors, and route scoring
     │   ├── SettingsScreen.tsx    # Cluster radius input (miles); persisted via AsyncStorage
@@ -159,7 +159,7 @@ Transient state (active geocoding, live route order, skip state) is still held i
 - **`clusterSales()` mutates its input.** It writes `clusterId` directly onto each `YardSale` object passed in. This is intentional — the same objects flow to MapScreen and RouteScreen.
 - **PRD vs. implementation divergence.** `prd.md` specifies Google Maps Geocoding API; the actual code uses Nominatim. `GOOGLE_MAPS_API_KEY` is only used for the map tile renderer (react-native-maps), not for geocoding.
 - **`useRoute` is not shared.** MapScreen and RouteScreen each instantiate `useRoute` independently. The map polyline will not update when stops are skipped on the route list screen.
-- **`visited` field is unused.** `YardSale.visited` is defined in the type but never set to `true` anywhere in the current implementation.
+- **Visited state lives in MapScreen only.** Tapping a pin opens a bottom overlay with Navigate and Mark Visited / Mark Unvisited buttons. Visited stops render as a gray circle with a white ✓ (custom marker view); unvisited stops use the default teardrop pin in their cluster color. `visitedIds` is a `Set<string>` in MapScreen state, merged into `sales[]` at save time so it persists in `SavedMap`. Custom marker views use `tracksViewChanges={false}` for performance. Do not use `Callout` for interactive content on Android — nested touchables inside `Callout` silently break rendering.
 - **Version display.** HelpScreen reads `version` directly from `package.json` and shows it as "Sale Path v{version}" at the top of the screen.
 - **`expo-file-system` quirk.** `FileSystem.documentDirectory` returns null in this environment (cause unknown). RouteScreen's Save feature uses `expo-file-system/legacy` (not the main entrypoint) and falls back to `cacheDirectory ?? documentDirectory`. For persistent key-value storage use `@react-native-async-storage/async-storage` instead.
 - **Out of scope for v1:** offline geocoding, saved routes/history, real drive-time estimation, time/energy cutoff, route-style toggle (priority vs. shortest).
