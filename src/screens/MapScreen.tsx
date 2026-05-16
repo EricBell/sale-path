@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useRoute } from '../hooks/useRoute';
@@ -15,21 +15,35 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
   const { sales, clusters, home, clusterRadiusMiles, savedMapId } = navRoute.params;
   const { route } = useRoute(sales, home);
 
+  const [visitedIds, setVisitedIds] = useState<Set<string>>(
+    () => new Set(sales.filter((s) => s.visited).map((s) => s.id))
+  );
+
+  const toggleVisited = useCallback((id: string) => {
+    setVisitedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   const doSave = useCallback(async (id: string) => {
-    const stopCount = sales.filter((s) => s.lat !== null).length;
+    const salesWithVisited = sales.map((s) => ({ ...s, visited: visitedIds.has(s.id) }));
+    const stopCount = salesWithVisited.filter((s) => s.lat !== null).length;
     const now = Date.now();
     await saveMap({
       id,
       name: generateMapName(stopCount),
       createdAt: now,
       updatedAt: now,
-      sales,
+      sales: salesWithVisited,
       clusters,
       home,
       clusterRadiusMiles,
     });
     Alert.alert('Saved', 'Map saved successfully.');
-  }, [sales, clusters, home, clusterRadiusMiles]);
+  }, [sales, visitedIds, clusters, home, clusterRadiusMiles]);
 
   const handleSave = useCallback(() => {
     if (savedMapId) {
@@ -80,21 +94,38 @@ export default function MapScreen({ navigation, route: navRoute }: Props) {
           pinColor={HOME_COLOR}
         />
 
-        {route.orderedStops.map((sale, index) =>
-          sale.lat !== null && sale.lng !== null ? (
+        {route.orderedStops.map((sale, index) => {
+          if (sale.lat === null || sale.lng === null) return null;
+          const isVisited = visitedIds.has(sale.id);
+          return (
             <Marker
               key={sale.id}
               coordinate={{ latitude: sale.lat, longitude: sale.lng }}
-              title={`${index + 1}. ${sale.rawAddress}`}
-              description={sale.notes || undefined}
               pinColor={
-                sale.clusterId !== null
+                isVisited
+                  ? '#AAAAAA'
+                  : sale.clusterId !== null
                   ? clusterColorById.get(sale.clusterId) ?? '#888'
                   : '#888'
               }
-            />
-          ) : null,
-        )}
+            >
+              <Callout>
+                <View style={styles.callout}>
+                  <Text style={styles.calloutTitle}>{`${index + 1}. ${sale.rawAddress}`}</Text>
+                  {sale.notes ? <Text style={styles.calloutNotes}>{sale.notes}</Text> : null}
+                  <TouchableOpacity
+                    style={[styles.visitBtn, isVisited && styles.visitedBtn]}
+                    onPress={() => toggleVisited(sale.id)}
+                  >
+                    <Text style={styles.visitBtnText}>
+                      {isVisited ? 'Mark Unvisited' : 'Mark Visited ✓'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Callout>
+            </Marker>
+          );
+        })}
 
         <Polyline coordinates={polyline} strokeColor="#2C3E50" strokeWidth={2} lineDashPattern={[6, 3]} />
       </MapView>
@@ -129,4 +160,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  callout: { width: 220, padding: 6 },
+  calloutTitle: { fontSize: 14, fontWeight: '600', color: '#222', marginBottom: 2 },
+  calloutNotes: { fontSize: 12, color: '#666', marginBottom: 4 },
+  visitBtn: {
+    backgroundColor: '#2980B9',
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  visitedBtn: { backgroundColor: '#27AE60' },
+  visitBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });
